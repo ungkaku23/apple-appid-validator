@@ -43,7 +43,7 @@ async def create_item(item: Item):
         r = requests.get(url, headers=headers)
         print(url)
         soup = BeautifulSoup(r.content, "lxml")
-        #print(soup.find_all("li", {"aria-current":"page"})[-1].text.split("of "))
+        #print(soup.find_all("li", {"aria-current":"page"})[-1].text.split("of ")) 
 
         j = soup.find(
             "script", {"data-zrr-shared-data-key": "mobileSearchPageStore"})
