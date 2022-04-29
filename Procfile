@@ -1,1 +1,1 @@
-web: uvicorn app.index:app --host=0.0.0.0 --port=${PORT:-8080}
+uvicorn index:app --reload
