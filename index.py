@@ -10,6 +10,8 @@ import pandas as pd
 
 class Item(BaseModel):
     zip_or_location: Optional[str] = None
+    number_of_pages: Optional[int] = 1
+    page_index: Optional[int] = 1
 
 app = FastAPI()
 
@@ -95,12 +97,18 @@ async def search_zillow(item: Item):
     pages = get_zillow_number_of_pages(soup)
     print(f' Found {pages} pages')
 
-    for i in range(pages):
-        print(f' Working on {i + 1} of {pages} pages')
-        url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/for_sale/{location}/{i+1}_p/?fromHomePage=true&shouldFireSellPageImplicitClaimGA=false&fromHomePageTab=buy"
+    if item.page_index <= 0 or item.number_of_pages <= 0:
+        return {
+            'data': [],
+            'number_of_pages': pages,
+            'page_index': item.page_index
+        }
+
+    if item.page_index <= pages:
+        print(f' Working on {item.page_index} of {pages} pages')
+        url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/for_sale/{location}/{item.page_index}_p/?fromHomePage=true&shouldFireSellPageImplicitClaimGA=false&fromHomePageTab=buy"
 
         r = requests.get(url, headers=headers)
-        print(url)
         soup = BeautifulSoup(r.content, "lxml")
 
         j = soup.find("script", {"data-zrr-shared-data-key": "mobileSearchPageStore"})
@@ -138,7 +146,11 @@ async def search_zillow(item: Item):
 
             zillow_data.append(data)
 
-    return zillow_data
+    return {
+        'data': zillow_data,
+        'number_of_pages': pages,
+        'page_index': item.page_index
+    }
 
 @app.post("/realtor/")
 async def search_realtor(item: Item):
@@ -152,17 +164,29 @@ async def search_realtor(item: Item):
     #START FETCHING RESULTS 
     check = get_realtor_page_status(soup)
     pages = get_realtor_number_of_pages(soup)
-    if check:
-        for i in range(pages):
-            print(f'Page {i + 1} of {pages}')
-            if i == 0:
+    
+    if item.page_index <= 0 or item.number_of_pages <= 0:
+        return {
+            'data': [],
+            'number_of_pages': pages,
+            'page_index': item.page_index
+        }
+
+    if item.page_index <= pages:
+        if check:
+            print(f'Page {item.page_index} of {pages}')
+            if item.page_index == 1:
                 realtor_data = get_realtor_list_info(check, realtor_data)
             else:
-                url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com/realestateandhomes-search/{location}/pg-{i + 1}'
+                url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com/realestateandhomes-search/{location}/pg-{item.page_index}'
                 r = requests.get(url, headers = headers)
                 soup = BeautifulSoup(r.content,"lxml")
                 check = get_realtor_page_status(soup)
                 realtor_data = get_realtor_list_info(check, realtor_data)
     
-    return realtor_data
+    return {
+        'data': realtor_data,
+        'number_of_pages': pages,
+        'page_index': item.page_index
+    }
     
