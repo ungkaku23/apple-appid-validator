@@ -92,7 +92,7 @@ async def search_zillow(item: Item):
     r = requests.get(url, headers=headers)
     soup = BeautifulSoup(r.content, "lxml")
     
-    pages = get_realtor_number_of_pages(soup)
+    pages = get_zillow_number_of_pages(soup)
     print(f' Found {pages} pages')
 
     for i in range(pages):
