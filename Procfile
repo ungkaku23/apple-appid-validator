@@ -1,1 +1,1 @@
-web: gunicorn -w 4 -k --max-requests 1200 uvicorn.workers.UvicornWorker index:app
+web: gunicorn --max-requests 1200 -w 4 -k uvicorn.workers.UvicornWorker index:app
