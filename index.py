@@ -56,7 +56,7 @@ def get_realtor_list_info(search_results, realtor_data):
         area = properties["description"]["sqft"]
         info = f'{bedrooms} bds, {bathrooms} ba ,{area} sqft'
         # broker = properties.get('brokerName')
-        property_url = f'http://api.scraperapi.com?api_key=3f9da8dfb24521572d1b962e169c2931&url=https://www.realtor.com/realestateandhomes-detail/{properties["permalink"]}'
+        property_url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com/realestateandhomes-detail/{properties["permalink"]}'
         # title = properties.get('statusText')
 
         data = {
@@ -87,7 +87,7 @@ def get_zillow_number_of_pages(soup_obj):
 async def search_zillow(item: Item):
     zillow_data = []
     location = item.zip_or_location.replace(" ","-")
-    url = f"http://api.scraperapi.com?api_key=3f9da8dfb24521572d1b962e169c2931&url=https://www.zillow.com/homes/for_sale/{location}/1_p/?fromHomePage=true&shouldFireSellPageImplicitClaimGA=false&fromHomePageTab=buy"
+    url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/for_sale/{location}/1_p/?fromHomePage=true&shouldFireSellPageImplicitClaimGA=false&fromHomePageTab=buy"
 
     r = requests.get(url, headers=headers)
     soup = BeautifulSoup(r.content, "lxml")
@@ -97,7 +97,7 @@ async def search_zillow(item: Item):
 
     for i in range(pages):
         print(f' Working on {i + 1} of {pages} pages')
-        url = f"http://api.scraperapi.com?api_key=3f9da8dfb24521572d1b962e169c2931&url=https://www.zillow.com/homes/for_sale/{location}/{i+1}_p/?fromHomePage=true&shouldFireSellPageImplicitClaimGA=false&fromHomePageTab=buy"
+        url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/for_sale/{location}/{i+1}_p/?fromHomePage=true&shouldFireSellPageImplicitClaimGA=false&fromHomePageTab=buy"
 
         r = requests.get(url, headers=headers)
         print(url)
@@ -144,7 +144,7 @@ async def search_zillow(item: Item):
 async def search_realtor(item: Item):
     realtor_data = []
     location = item.zip_or_location.replace(" ","-").replace(",","_")
-    url = f"http://api.scraperapi.com?api_key=3f9da8dfb24521572d1b962e169c2931&url=https://www.realtor.com/realestateandhomes-search/{location}"
+    url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com/realestateandhomes-search/{location}"
     
     r = requests.get(url, headers = headers)
     soup = BeautifulSoup(r.content,"lxml")
@@ -158,7 +158,7 @@ async def search_realtor(item: Item):
             if i == 0:
                 realtor_data = get_realtor_list_info(check, realtor_data)
             else:
-                url = f'http://api.scraperapi.com?api_key=3f9da8dfb24521572d1b962e169c2931&url=https://www.realtor.com/realestateandhomes-search/{location}/pg-{i + 1}'
+                url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com/realestateandhomes-search/{location}/pg-{i + 1}'
                 r = requests.get(url, headers = headers)
                 soup = BeautifulSoup(r.content,"lxml")
                 check = get_realtor_page_status(soup)
