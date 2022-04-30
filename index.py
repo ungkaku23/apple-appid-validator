@@ -10,7 +10,6 @@ import pandas as pd
 
 class Item(BaseModel):
     zip_or_location: Optional[str] = None
-    number_of_pages: Optional[int] = 1
     page_index: Optional[int] = 1
 
 app = FastAPI()
@@ -97,7 +96,7 @@ async def search_zillow(item: Item):
     pages = get_zillow_number_of_pages(soup)
     print(f' Found {pages} pages')
 
-    if item.page_index <= 0 or item.number_of_pages <= 0:
+    if item.page_index <= 0:
         return {
             'data': [],
             'number_of_pages': pages,
@@ -165,7 +164,7 @@ async def search_realtor(item: Item):
     check = get_realtor_page_status(soup)
     pages = get_realtor_number_of_pages(soup)
     
-    if item.page_index <= 0 or item.number_of_pages <= 0:
+    if item.page_index <= 0:
         return {
             'data': [],
             'number_of_pages': pages,
