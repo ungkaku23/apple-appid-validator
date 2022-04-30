@@ -82,6 +82,7 @@ async def create_item(item: Item):
 
     r = requests.get(url, headers=headers)
     soup = BeautifulSoup(r.content, "lxml")
+    print(soup.find_all("li", {"aria-current": "page"})[-1])
     pages = soup.find_all("li", {"aria-current": "page"})[-1].text.split("of ")[-1]
     print(f' Found {pages} pages')
 
