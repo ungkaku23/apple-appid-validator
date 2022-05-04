@@ -8,9 +8,12 @@ import json
 from bs4 import BeautifulSoup
 import pandas as pd
 
+# home_type: rent, sale (for zillow)
+
 class Item(BaseModel):
     zip_or_location: Optional[str] = None
     page_index: Optional[int] = 1
+    home_type: Optional[str] = None 
 
 app = FastAPI()
 
@@ -45,7 +48,7 @@ def get_realtor_number_of_pages(soup_obj):
         print("Found 1 Page")
     return pages
 
-def get_realtor_list_info(search_results, realtor_data):
+def get_realtor_sale_list(search_results, realtor_data):
     for properties in search_results:
         address = f'{properties["location"]["address"]["line"]} , {properties["location"]["address"]["state"]} , {properties["location"]["address"]["postal_code"]}'
         city = properties["location"]["address"]["city"]
@@ -75,6 +78,41 @@ def get_realtor_list_info(search_results, realtor_data):
 
     return realtor_data
 
+def get_realtor_rent_list(search_results, realtor_data):
+    for properties in search_results:
+        address = f'{properties.find("div", {"data-testid" : "card-address-1"}).text} {properties.find("div", {"data-testid" : "card-address-2"}).text}'
+        city = properties.find("div", {"data-testid" : "card-address-2"}).text.split(", ")[0]
+        state = properties.find("div", {"data-testid" : "card-address-2"}).text.split(", ")[1].split(" ")[0]
+        postal_code = properties.find("div", {"data-testid" : "card-address-2"}).text.split(", ")[1].split(" ")[1]
+        price = properties.find("div", {"data-testid" : "card-price"}).text
+        bedrooms = properties.find("li", {"data-testid" : "property-meta-beds"}).find("span").text
+        bathrooms = properties.find("li", {"data-testid" : "property-meta-baths"}).find("span").text
+        area = ""
+        try:
+            area = properties.find("li", {"data-testid" : "property-meta-sqft"}).find("span", {"data-testid" : "meta-value"}).text
+        except:
+            area = ""
+        
+        info = f'{bedrooms} bds, {bathrooms} ba ,{area} sqft'
+        # broker = properties.get('brokerName')
+        property_url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com{properties.find("a", {"data-testid" : "card-link"}).get("href")}'
+        # title = properties.get('statusText')
+
+        data = {
+            'address': address,
+            'city': city,
+            'state': state,
+            'postal_code': postal_code,
+            'price': price,
+            'facts and features': info,
+            # 'real estate provider': broker,
+            'url': property_url,
+            # 'title': title
+        }
+        realtor_data.append(data)
+
+    return realtor_data
+
 def get_zillow_number_of_pages(soup_obj):
     try:
         pages = int(soup_obj.find_all("li", {"aria-current": "page"})[-1].text.split("of ")[-1])
@@ -87,8 +125,8 @@ def get_zillow_number_of_pages(soup_obj):
 @app.post("/zillow/")
 async def search_zillow(item: Item):
     zillow_data = []
-    location = item.zip_or_location.replace(" ","-")
-    url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/for_sale/{location}/1_p/?fromHomePage=true&shouldFireSellPageImplicitClaimGA=false&fromHomePageTab=buy"
+    location = item.zip_or_location.replace(" ","-").replace(",","_")
+    url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/for_{item.home_type}/{location}/1_p"
 
     r = requests.get(url, headers=headers)
     soup = BeautifulSoup(r.content, "lxml")
@@ -105,7 +143,7 @@ async def search_zillow(item: Item):
 
     if item.page_index <= pages:
         print(f' Working on {item.page_index} of {pages} pages')
-        url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/for_sale/{location}/{item.page_index}_p/?fromHomePage=true&shouldFireSellPageImplicitClaimGA=false&fromHomePageTab=buy"
+        url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/for_{item.home_type}/{location}/{item.page_index}_p"
 
         r = requests.get(url, headers=headers)
         soup = BeautifulSoup(r.content, "lxml")
@@ -117,11 +155,11 @@ async def search_zillow(item: Item):
         
         search_results = w_json.get('cat1').get('searchResults').get('listResults', [])
         for properties in search_results:
+            # print(properties)
             address = properties.get('address')
-            property_info = properties.get('hdpData', {}).get('homeInfo')
-            city = property_info.get('city')
-            state = property_info.get('state')
-            postal_code = property_info.get('zipcode')
+            city = properties.get('addressCity')
+            state = properties.get('addressState')
+            postal_code = properties.get('addressZipcode')
             price = properties.get('price')
             bedrooms = properties.get('beds')
             bathrooms = properties.get('baths')
@@ -155,7 +193,12 @@ async def search_zillow(item: Item):
 async def search_realtor(item: Item):
     realtor_data = []
     location = item.zip_or_location.replace(" ","-").replace(",","_")
-    url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com/realestateandhomes-search/{location}"
+    base_url = "https://www.realtor.com/realestateandhomes-search"
+    if item.home_type == "rent":
+        base_url = "https://www.realtor.com/apartments"
+
+    url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}"
+    print(url)
     
     r = requests.get(url, headers = headers)
     soup = BeautifulSoup(r.content,"lxml")
@@ -172,16 +215,22 @@ async def search_realtor(item: Item):
         }
 
     if item.page_index <= pages:
-        if check:
-            print(f'Page {item.page_index} of {pages}')
-            if item.page_index == 1:
-                realtor_data = get_realtor_list_info(check, realtor_data)
-            else:
-                url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com/realestateandhomes-search/{location}/pg-{item.page_index}'
-                r = requests.get(url, headers = headers)
-                soup = BeautifulSoup(r.content,"lxml")
-                check = get_realtor_page_status(soup)
-                realtor_data = get_realtor_list_info(check, realtor_data)
+        if item.home_type == "sale":
+            if check:
+                print(f'Page {item.page_index} of {pages}')
+                if item.page_index == 1:
+                    realtor_data = get_realtor_sale_list(check, realtor_data)
+                else:
+                    url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}/pg-{item.page_index}'
+                    r = requests.get(url, headers = headers)
+                    soup = BeautifulSoup(r.content,"lxml")
+                    check = get_realtor_page_status(soup)
+                    realtor_data = get_realtor_sale_list(check, realtor_data)
+        else:
+            url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}/pg-{item.page_index}'
+            r = requests.get(url, headers = headers)
+            soup = BeautifulSoup(r.content,"lxml")
+            realtor_data = get_realtor_rent_list(soup.find_all("div", {"class": "card-content"}), realtor_data)
     
     return {
         'data': realtor_data,
