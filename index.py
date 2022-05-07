@@ -7,6 +7,7 @@ import requests
 import json
 from bs4 import BeautifulSoup
 import pandas as pd
+import re
 
 # home_type: rent, sale (for zillow)
 
@@ -14,6 +15,8 @@ class Item(BaseModel):
     zip_or_location: Optional[str] = None
     page_index: Optional[int] = 1
     home_type: Optional[str] = None 
+    price_min: Optional[int] = -1
+    price_max: Optional[int] = -1
 
 app = FastAPI()
 
@@ -48,6 +51,34 @@ def get_realtor_number_of_pages(soup_obj):
         print("Found 1 Page")
     return pages
 
+def checkSearchOption(price, item):
+    is_matched = True
+
+    price_arr = price.split("-")
+    price_min = 0
+    price_max = 0
+
+    if len(price_arr) == 1:
+        if re.sub("[^0-9]", "", price_arr[0]) == "":
+            is_matched = True
+        else:
+            price_min = price_max = int(price_arr[0].replace(",", "").replace("$", "").replace(" ", ""))
+
+            if item.price_min != -1 and item.price_min > price_min:
+                is_matched = False
+            if item.price_max != -1 and item.price_max < price_max:
+                is_matched = False
+    else:
+        price_min = int(price_arr[0].replace(",", "").replace("$", "").replace(" ", ""))
+        price_max = int(price_arr[1].replace(",", "").replace("$", "").replace(" ", ""))
+
+        if item.price_min != -1 and item.price_min > price_min:
+            is_matched = False
+        if item.price_max != -1 and item.price_max < price_max:
+            is_matched = False
+
+    return is_matched
+
 def get_realtor_sale_list(search_results, realtor_data):
     for properties in search_results:
         address = f'{properties["location"]["address"]["line"]} , {properties["location"]["address"]["state"]} , {properties["location"]["address"]["postal_code"]}'
@@ -78,15 +109,42 @@ def get_realtor_sale_list(search_results, realtor_data):
 
     return realtor_data
 
-def get_realtor_rent_list(search_results, realtor_data):
+def get_realtor_rent_list(search_results, realtor_data, item):
     for properties in search_results:
-        address = f'{properties.find("div", {"data-testid" : "card-address-1"}).text} {properties.find("div", {"data-testid" : "card-address-2"}).text}'
-        city = properties.find("div", {"data-testid" : "card-address-2"}).text.split(", ")[0]
-        state = properties.find("div", {"data-testid" : "card-address-2"}).text.split(", ")[1].split(" ")[0]
-        postal_code = properties.find("div", {"data-testid" : "card-address-2"}).text.split(", ")[1].split(" ")[1]
-        price = properties.find("div", {"data-testid" : "card-price"}).text
-        bedrooms = properties.find("li", {"data-testid" : "property-meta-beds"}).find("span").text
-        bathrooms = properties.find("li", {"data-testid" : "property-meta-baths"}).find("span").text
+        address1 = ""
+        try:
+            address1 = properties.find("div", {"data-testid" : "card-address-1"}).text
+        except:
+            address1 = ""
+
+        address2 = ""
+        try:
+            address2 = properties.find("div", {"data-testid" : "card-address-2"}).text
+        except:
+            address2 = ""
+
+        address = f'{address1} {address2}'
+        city = address2.split(", ")[0]
+        state = address2.split(", ")[1].split(" ")[0]
+        postal_code = address2.split(", ")[1].split(" ")[1]
+        price = ""
+        try:
+            price = properties.find("div", {"data-testid" : "card-price"}).text
+        except:
+            price = ""
+        
+        bedrooms = ""
+        try:
+            bedrooms = properties.find("li", {"data-testid" : "property-meta-beds"}).find("span").text
+        except:
+            bedrooms = ""
+        
+        bathrooms = ""
+        try:
+            bathrooms = properties.find("li", {"data-testid" : "property-meta-baths"}).find("span").text
+        except:
+            bathrooms = ""
+        
         area = ""
         try:
             area = properties.find("li", {"data-testid" : "property-meta-sqft"}).find("span", {"data-testid" : "meta-value"}).text
@@ -109,7 +167,11 @@ def get_realtor_rent_list(search_results, realtor_data):
             'url': property_url,
             # 'title': title
         }
-        realtor_data.append(data)
+
+        
+
+        if checkSearchOption(price, item):
+            realtor_data.append(data)
 
     return realtor_data
 
@@ -214,23 +276,24 @@ async def search_realtor(item: Item):
             'page_index': item.page_index
         }
 
-    if item.page_index <= pages:
+    for i in range(int(pages)):
         if item.home_type == "sale":
             if check:
-                print(f'Page {item.page_index} of {pages}')
-                if item.page_index == 1:
-                    realtor_data = get_realtor_sale_list(check, realtor_data)
+                print(f'Page {i + 1} of {pages}')
+                if (i + 1) == 1:
+                    realtor_data = get_realtor_sale_list(check, realtor_data, item)
                 else:
-                    url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}/pg-{item.page_index}'
+                    url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}/pg-{i + 1}'
                     r = requests.get(url, headers = headers)
                     soup = BeautifulSoup(r.content,"lxml")
                     check = get_realtor_page_status(soup)
-                    realtor_data = get_realtor_sale_list(check, realtor_data)
+                    realtor_data = get_realtor_sale_list(check, realtor_data, item)
         else:
-            url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}/pg-{item.page_index}'
+            print(f'Page {i + 1} of {pages}')
+            url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}/pg-{i + 1}'
             r = requests.get(url, headers = headers)
             soup = BeautifulSoup(r.content,"lxml")
-            realtor_data = get_realtor_rent_list(soup.find_all("div", {"class": "card-content"}), realtor_data)
+            realtor_data = get_realtor_rent_list(soup.find_all("div", {"class": "card-content"}), realtor_data, item)
     
     return {
         'data': realtor_data,
