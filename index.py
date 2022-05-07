@@ -262,7 +262,7 @@ async def search_realtor(item: Item):
     url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}"
     print(url)
     
-    r = requests.get(url, headers = headers)
+    r = requests.get(url, headers = headers, timeout=3)
     soup = BeautifulSoup(r.content,"lxml")
 
     #START FETCHING RESULTS 
@@ -284,14 +284,14 @@ async def search_realtor(item: Item):
                     realtor_data = get_realtor_sale_list(check, realtor_data, item)
                 else:
                     url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}/pg-{i + 1}'
-                    r = requests.get(url, headers = headers)
+                    r = requests.get(url, headers = headers, timeout=3)
                     soup = BeautifulSoup(r.content,"lxml")
                     check = get_realtor_page_status(soup)
                     realtor_data = get_realtor_sale_list(check, realtor_data, item)
         else:
             print(f'Page {i + 1} of {pages}')
             url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={base_url}/{location}/pg-{i + 1}'
-            r = requests.get(url, headers = headers)
+            r = requests.get(url, headers = headers, timeout=3)
             soup = BeautifulSoup(r.content,"lxml")
             realtor_data = get_realtor_rent_list(soup.find_all("div", {"class": "card-content"}), realtor_data, item)
     
