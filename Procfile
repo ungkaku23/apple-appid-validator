@@ -1,1 +1,1 @@
-web: gunicorn --max-requests 1200 --timeout 1000 -w 6 -k uvicorn.workers.UvicornWorker index:app
+web: gunicorn --max-requests 1200 --timeout 6000 -w 6 -k uvicorn.workers.UvicornWorker index:app
