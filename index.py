@@ -164,29 +164,24 @@ def get_zillow_number_of_pages(soup_obj):
 @app.post("/zillow/")
 async def search_zillow(item: Item):
     zillow_data = []
-    location = item.zip_or_location.replace(" ","-").replace(",","_")
+    location = item.zip_or_location.replace(" ","-").replace(",",",-") + "_rb"
+    url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/{location}/"
+    r = requests.get(url, headers=headers)
+    soup = BeautifulSoup(r.content, "lxml")
+
+    j = soup.find("script", {"data-zrr-shared-data-key": "mobileSearchPageStore"})
+
+    j_data = str(j).split("--")[1]
+    w_json = json.loads(j_data)
+    query_state = w_json.get("queryState")
 
     extra_condition = {
         "pagination": {},
-        "usersSearchTerm": item.zip_or_location,
-        "mapBounds": {
-            "west": -80.71154307733529,
-            "east": -80.38195323358529,
-            "south": 43.45099180920751,
-            "north": 43.51351858789811
-        },
-        "regionSelection": [
-            {
-            "regionId": 792687,
-            "regionType": 6
-            }
-        ],
+        "usersSearchTerm": query_state["usersSearchTerm"],
+        "mapBounds": query_state["mapBounds"],
+        "regionSelection": query_state["regionSelection"],
         "isMapVisible": True,
         "filterState": {
-            "price": {
-            "min": 340694,
-            "max": 794953
-            },
             "beds": {
             "min": 0
             },
@@ -306,7 +301,7 @@ async def search_zillow(item: Item):
     if item.page_index <= pages:
         print(f' Working on {item.page_index} of {pages} pages')
         url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.zillow.com/homes/{item.page_index}_p?searchQueryState={encoded_url}"
-        print(url)
+
         r = requests.get(url, headers=headers)
         soup = BeautifulSoup(r.content, "lxml")
 
@@ -317,30 +312,57 @@ async def search_zillow(item: Item):
         
         search_results = w_json.get('cat1').get('searchResults').get('listResults', [])
         for properties in search_results:
-            # print(properties)
+            link = properties.get('detailUrl')
+
+            url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={link}"
+            print(url)
+            r = requests.get(url, headers=headers)
+            soup = BeautifulSoup(r.content, "lxml")
+
+            try:
+                landlord_name = soup.find("span", {"class" : "ds-listing-agent-display-name"}).text
+            except:
+                landlord_name = ""
+
+            try:
+                landlord_company = soup.find("span", {"class" : "ds-listing-agent-business-name"}).text
+            except:
+                landlord_company = ""
+
+            try:
+                landlord_contact = soup.find("li", {"class" : "ds-listing-agent-info-text"}).text
+            except:
+                landlord_contact = ""
+
+            try:
+                imgs = []
+                img_containers = soup.findAll("li", {"class" : "media-stream-tile"})
+                for img_widget in img_containers:
+                    imgs.append(img_widget.find("img")['src'])
+            except:
+                imgs = []
+            
             address = properties.get('address')
-            city = properties.get('addressCity')
             state = properties.get('addressState')
-            postal_code = properties.get('addressZipcode')
-            price = properties.get('price')
-            bedrooms = properties.get('beds')
-            bathrooms = properties.get('baths')
-            area = properties.get('area')
-            info = f'{bedrooms} bds, {bathrooms} ba ,{area} sqft'
-            broker = properties.get('brokerName')
-            property_url = properties.get('detailUrl')
-            title = properties.get('statusText')
+            zipcode = properties.get('addressZipcode')
+            landlord_rent = properties.get('price')
+            beds = properties.get('beds')
+            baths = properties.get('baths')
+            square_footage = properties.get('area')
 
             data = {
+                'link': link,
                 'address': address,
-                'city': city,
                 'state': state,
-                'postal_code': postal_code,
-                'price': price,
-                'facts and features': info,
-                'real estate provider': broker,
-                'url': property_url,
-                'title': title
+                'zipcode': zipcode,
+                'landlord_rent': landlord_rent,
+                'landlord_name': landlord_name,
+                'landlord_company': landlord_company,
+                'landlord_contact': landlord_contact,
+                'beds': beds,
+                'baths': baths,
+                'square_footage': square_footage,
+                'imgs': imgs
             }
 
             zillow_data.append(data)
