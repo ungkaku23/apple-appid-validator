@@ -104,48 +104,54 @@ def get_realtor_rent_list(search_results, realtor_data):
             address2 = ""
 
         address = f'{address1} {address2}'
-        city = address2.split(", ")[0]
         state = address2.split(", ")[1].split(" ")[0]
-        postal_code = address2.split(", ")[1].split(" ")[1]
+        zipcode = address2.split(", ")[1].split(" ")[1]
         price = ""
         try:
             price = properties.find("div", {"data-testid" : "card-price"}).text
         except:
             price = ""
         
-        bedrooms = ""
+        beds = ""
         try:
-            bedrooms = properties.find("li", {"data-testid" : "property-meta-beds"}).find("span").text
+            beds = properties.find("li", {"data-testid" : "property-meta-beds"}).find("span").text
         except:
-            bedrooms = ""
+            beds = ""
         
-        bathrooms = ""
+        baths = ""
         try:
-            bathrooms = properties.find("li", {"data-testid" : "property-meta-baths"}).find("span").text
+            baths = properties.find("li", {"data-testid" : "property-meta-baths"}).find("span").text
         except:
-            bathrooms = ""
+            baths = ""
         
-        area = ""
+        square_footage = ""
         try:
-            area = properties.find("li", {"data-testid" : "property-meta-sqft"}).find("span", {"data-testid" : "meta-value"}).text
+            square_footage = properties.find("li", {"data-testid" : "property-meta-sqft"}).find("span", {"data-testid" : "meta-value"}).text
         except:
-            area = ""
+            square_footage = ""
         
-        info = f'{bedrooms} bds, {bathrooms} ba ,{area} sqft'
-        # broker = properties.get('brokerName')
-        property_url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com{properties.find("a", {"data-testid" : "card-link"}).get("href")}'
-        # title = properties.get('statusText')
+        link = properties.find("a", {"data-testid" : "card-link"}).get("href")
+        property_url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com{link}'
+
+        r = requests.get(property_url, headers=headers)
+        soup = BeautifulSoup(r.content, "lxml")
+        j_data = soup.find("script", {"id": "__NEXT_DATA__"})
+        w_json = json.loads(j_data)
+        print(w_json['props']['pageProps']['property'])
 
         data = {
+            'link': f"https://www.realtor.com{link}",
             'address': address,
-            'city': city,
             'state': state,
-            'postal_code': postal_code,
-            'price': price,
-            'facts and features': info,
-            # 'real estate provider': broker,
-            'url': property_url,
-            # 'title': title
+            'zipcode': zipcode,
+            'landlord_rent': price,
+            'landlord_name': '',
+            'landlord_company': '',
+            'landlord_contact': '',
+            'beds': beds,
+            'baths': baths,
+            'square_footage': square_footage,
+            'imgs': ''
         }
 
         realtor_data.append(data)
@@ -315,33 +321,44 @@ async def search_zillow(item: Item):
             link = properties.get('detailUrl')
 
             url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={link}"
-            print(url)
             r = requests.get(url, headers=headers)
             soup = BeautifulSoup(r.content, "lxml")
+            
+            url = f"https://www.zillow.com/rentals/api/rcf/v1/rcf"
+            agent_headers = {
+                'Content-Type': 'application/json',
+                'Accept': '*/*',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36'
+            }
+            zpid = link.split("/")[len(link.split("/")) - 2].split("_")[0]
+            agentr = requests.post(url, headers=agent_headers, data=json.dumps({"zpid": zpid}))
+            agent_json = agentr.json()
 
             try:
-                landlord_name = soup.find("span", {"class" : "ds-listing-agent-display-name"}).text
+                landlord_name = agent_json['propertyInfo']['agentInfo']['displayName']
             except:
                 landlord_name = ""
 
             try:
-                landlord_company = soup.find("span", {"class" : "ds-listing-agent-business-name"}).text
+                landlord_company = agent_json['propertyInfo']['agentInfo']['businessName']
             except:
                 landlord_company = ""
 
             try:
-                landlord_contact = soup.find("li", {"class" : "ds-listing-agent-info-text"}).text
+                landlord_contact = agent_json['propertyInfo']['agentInfo']['phoneNumber']
             except:
                 landlord_contact = ""
 
-            try:
-                imgs = []
-                img_containers = soup.findAll("li", {"class" : "media-stream-tile"})
-                for img_widget in img_containers:
+
+            imgs = []
+            img_containers = soup.findAll("li", {"class" : "media-stream-tile"})
+            for img_widget in img_containers:
+                try:
                     imgs.append(img_widget.find("img")['src'])
-            except:
-                imgs = []
-            
+                except:
+                    None
             address = properties.get('address')
             state = properties.get('addressState')
             zipcode = properties.get('addressZipcode')
