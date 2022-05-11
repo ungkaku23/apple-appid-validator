@@ -1,3 +1,4 @@
+from os import stat
 from typing import Optional
 
 from fastapi import FastAPI
@@ -61,29 +62,91 @@ def get_realtor_number_of_pages(soup_obj):
 
 def get_realtor_sale_list(search_results, realtor_data):
     for properties in search_results:
-        address = f'{properties["location"]["address"]["line"]} , {properties["location"]["address"]["state"]} , {properties["location"]["address"]["postal_code"]}'
-        city = properties["location"]["address"]["city"]
-        state = properties["location"]["address"]["state"]
-        postal_code = properties["location"]["address"]["postal_code"]
-        price = properties["list_price"]
-        bedrooms = properties["description"]["beds"]
-        bathrooms = properties["description"]["baths"]
-        area = properties["description"]["sqft"]
-        info = f'{bedrooms} bds, {bathrooms} ba ,{area} sqft'
-        # broker = properties.get('brokerName')
-        property_url = f'http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url=https://www.realtor.com/realestateandhomes-detail/{properties["permalink"]}'
-        # title = properties.get('statusText')
+        try:
+            address1 = properties["location"]["address"]["line"]
+        except:
+            address1 = ""
+        
+        try:
+            address2 = properties["location"]["address"]["state"]
+        except:
+            address2 = ""
+        
+        try:
+            address3 = properties["location"]["address"]["postal_code"]
+        except:
+            address3 = ""
+
+        address = f'{address1} , {address2} , {address3}'
+
+        try:
+            state = properties["location"]["address"]["state"]
+        except:
+            state = ""
+        
+        try:
+            zipcode = properties["location"]["address"]["postal_code"]
+        except:
+            zipcode = ""
+
+        try:
+            price = properties["list_price"]
+        except:
+            price = ""
+        
+        try:
+            beds = properties["description"]["beds"]
+        except:
+            beds = ""
+
+        try:
+            baths = properties["description"]["baths"]
+        except:
+            baths = ""
+        
+        try:
+            square_footage = properties["description"]["sqft"]
+        except:
+            square_footage = ""
+
+        link = f"https://www.realtor.com/realestateandhomes-detail/{properties['permalink']}"
+
+        property_url = f"http://api.scraperapi.com?api_key=7cd363bccba24d9d1b8ea9d1b95308a6&url={link}"
+        r = requests.get(property_url, headers=headers)
+        soup = BeautifulSoup(r.content, "lxml")
+        j_data = soup.find("script", {"id": "__NEXT_DATA__"}).text
+        w_json = json.loads(j_data)
+
+        imgs = []
+        try:
+            photos = w_json['props']['pageProps']['property']['photos']
+        except:
+            photos = []
+        
+        for photo in photos:
+            imgs.append(photo['href'])
+
+        try:
+            phones = w_json['props']['pageProps']['property']['advertisers'][0]['office']['phones']
+            for phone in phones:
+                if (phone['number'] is not None):
+                    landlord_contact = phone['number']
+        except:
+            landlord_contact = ""
 
         data = {
+            'link': link,
             'address': address,
-            'city': city,
             'state': state,
-            'postal_code': postal_code,
-            'price': price,
-            'facts and features': info,
-            # 'real estate provider': broker,
-            'url': property_url,
-            # 'title': title
+            'zipcode': zipcode,
+            'landlord_rent': price,
+            'landlord_name': '',
+            'landlord_company': '',
+            'landlord_contact': landlord_contact,
+            'beds': beds,
+            'baths': baths,
+            'square_footage': square_footage,
+            'imgs': imgs
         }
         realtor_data.append(data)
 
@@ -135,9 +198,25 @@ def get_realtor_rent_list(search_results, realtor_data):
 
         r = requests.get(property_url, headers=headers)
         soup = BeautifulSoup(r.content, "lxml")
-        j_data = soup.find("script", {"id": "__NEXT_DATA__"})
+        j_data = soup.find("script", {"id": "__NEXT_DATA__"}).text
         w_json = json.loads(j_data)
-        print(w_json['props']['pageProps']['property'])
+
+        imgs = []
+        try:
+            photos = w_json['props']['pageProps']['property']['photos']
+        except:
+            photos = []
+        
+        for photo in photos:
+            imgs.append(photo['href'])
+
+        try:
+            phones = w_json['props']['pageProps']['property']['advertisers'][0]['office']['phones']
+            for phone in phones:
+                if (phone['number'] is not None):
+                    landlord_contact = phone['number']
+        except:
+            landlord_contact = ""
 
         data = {
             'link': f"https://www.realtor.com{link}",
@@ -147,11 +226,11 @@ def get_realtor_rent_list(search_results, realtor_data):
             'landlord_rent': price,
             'landlord_name': '',
             'landlord_company': '',
-            'landlord_contact': '',
+            'landlord_contact': landlord_contact,
             'beds': beds,
             'baths': baths,
             'square_footage': square_footage,
-            'imgs': ''
+            'imgs': imgs
         }
 
         realtor_data.append(data)
