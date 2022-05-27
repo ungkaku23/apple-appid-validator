@@ -2,6 +2,7 @@ from os import stat
 from typing import Optional
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import requests
@@ -28,6 +29,14 @@ class Item(BaseModel):
     baths: Optional[int] = -1
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 headers = {
     'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -460,7 +469,7 @@ async def search_zillow(item: Item):
                 'square_footage': square_footage,
                 'imgs': imgs
             }
-
+            
             zillow_data.append(data)
 
     return {
